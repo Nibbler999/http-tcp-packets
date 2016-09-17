@@ -1,0 +1,15 @@
+{
+  "name": "http-tcp-packets",
+  "version": "1.0.0",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/Nibbler999/http-tcp-packets"
+  },
+  "dependencies": {
+    "varint": "^4.0.0",
+    "length-prefixed-stream": "^1.5.0",
+    "readable-stream": "^2.0.0",
+    "process-nextick-args": "^1.0.6"
+  }
+}

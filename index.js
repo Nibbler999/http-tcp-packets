@@ -94,10 +94,10 @@ Wrap.prototype._read = function (n) {
 };
 
 Wrap.prototype._write = function (data, encoding, cb) {
-    maybeCork(this.socket);
+    this.socket.cork();
     this.socket.write(getVarintBytes(data.length));
     this.socket.write(data, cb);
-    maybeUncork(this.socket);
+    nextTick(uncork, this.socket);
 };
 
 Wrap.prototype.writeMultipart = function (parts, cb) {
@@ -108,7 +108,7 @@ Wrap.prototype.writeMultipart = function (parts, cb) {
         length += parts[i].length;
     }
 
-    maybeCork(this.socket);
+    this.socket.cork();
 
     this.socket.write(getVarintBytes(length));
 
@@ -118,7 +118,7 @@ Wrap.prototype.writeMultipart = function (parts, cb) {
 
     this.socket.write(parts[parts.length - 1], cb);
 
-    maybeUncork(this.socket);
+    nextTick(uncork, this.socket);
 };
 
 function getVarintBytes (length) {
@@ -131,18 +131,6 @@ function getVarintBytes (length) {
     used += varint.encode.bytes;
 
     return pool.slice(used - varint.encode.bytes, used);
-}
-
-function maybeCork (socket) {
-    if (socket.cork) {
-        socket.cork();
-    }
-}
-
-function maybeUncork (socket) {
-    if (socket.uncork) {
-        nextTick(uncork, socket);
-    }
 }
 
 function uncork(socket) {

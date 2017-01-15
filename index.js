@@ -50,12 +50,13 @@ var Wrap = function (socket, opts) {
         return new Wrap(socket, opts);
     }
 
-    stream.Duplex.call(this);
+    stream.Duplex.call(this, { objectMode: true });
 
     this._missing = 0;
     this._message = null;
+    this._flags = 0;
     this._limit = opts && opts.limit || 0;
-    this._prefix = new Buffer(4);
+    this._prefix = new Buffer(8);
     this._ptr = 0;
     this.socket = socket;
 
@@ -72,11 +73,19 @@ Wrap.prototype._push = function (message) {
     this._ptr = 0;
     this._missing = 0;
     this._message = null;
+
+    if (this._flags & 1) {
+        message = message.toString();
+    }
+
+    this._flags = 0;
+
     this.push(message);
 }
 
 Wrap.prototype._prefixError = function (data) {
     this.emit('error', new Error('Message is larger than max length'));
+    this.socket.destroy();
     return data.length;
 }
 
@@ -85,9 +94,11 @@ Wrap.prototype._parseLength = function (data, offset) {
     for (offset; offset < data.length; offset++) {
         if (this._ptr >= this._prefix.length) return this._prefixError(data)
         this._prefix[this._ptr++] = data[offset]
-        if (this._ptr === 4) {
+        if (this._ptr === 8) {
             this._missing = this._prefix.readUInt32BE(0, true);
+            this._flags = this._prefix.readUInt32BE(4, true);
             if (this._limit && this._missing > this._limit) return this._prefixError(data)
+            if ((this._flags & 1) && this._missing > (1 << 28) - 16) return this._prefixError(data)
             this._ptr = 0
             return offset + 1
         }
@@ -130,23 +141,39 @@ Wrap.prototype._read = function (n) {
 };
 
 Wrap.prototype._write = function (data, encoding, cb) {
-    this.socket.cork();
-    this.socket.write(getLengthBytes(data.length));
-    this.socket.write(data, cb);
-    nextTick(uncork, this.socket);
+    this.write(data, cb);
 };
 
-Wrap.prototype.writeMultipart = function (parts, cb) {
-    var length = 0;
-    var i = 0;
+Wrap.prototype.write = function (data, cb) {
 
-    for (i = 0; i < parts.length; i++) {
-        length += parts[i].length;
+    var flags = 0;
+
+    if (typeof data === 'string') {
+        data = new Buffer(data);
+        flags |= 1;
     }
 
     this.socket.cork();
 
-    this.socket.write(getLengthBytes(length));
+    this.socket.write(getPrefix(data.length, flags));
+    this.socket.write(data, cb);
+
+    nextTick(uncork, this.socket);
+};
+
+Wrap.prototype.writev = function (parts, cb) {
+
+    var flags = 0;
+    var length = 0;
+    var i = 0;
+
+    for (i = 0; i < parts.length; i++) {
+       length += parts[i].length;
+    }
+
+    this.socket.cork();
+
+    this.socket.write(getPrefix(length, flags));
 
     for (i = 0; i < parts.length - 1; i++) {
         this.socket.write(parts[i]);
@@ -157,11 +184,12 @@ Wrap.prototype.writeMultipart = function (parts, cb) {
     nextTick(uncork, this.socket);
 };
 
-function getLengthBytes (length) {
+function getPrefix (length, flags) {
 
-    var header = new Buffer(4);
-    header.writeUInt32BE(length, 0, true);
-    return header;
+    var prefix = new Buffer(8);
+    prefix.writeUInt32BE(length, 0, true);
+    prefix.writeUInt32BE(flags, 4, true);
+    return prefix;
 }
 
 function uncork (socket) {

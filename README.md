@@ -1,7 +1,7 @@
 
 # http-tcp-packets
 
-Send and receive data packets over an upgraded http connection
+Send and receive data over an upgraded http connection
 
 ## Server side
 
@@ -24,7 +24,7 @@ srv.on('upgrade', (req, socket, head) => {
         conn.write('hello client');
 
         conn.on('data', (data) => {
-            console.log('%s', data);
+            console.log(data);
         });
     });
 });
@@ -58,7 +58,7 @@ packetClient.connect(opts, function (err, conn) {
     conn.write('hello server');
 
     conn.on('data', (data) => {
-        console.log('%s', data);
+        console.log(data);
     });
 });
 ```

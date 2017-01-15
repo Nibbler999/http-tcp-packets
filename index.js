@@ -1,14 +1,9 @@
-var varint = require('varint');
-var stream = require('readable-stream');
+var stream = require('stream');
 var util = require('util');
 var http = require('http');
 var https = require('https');
 
-var Decoder = require('length-prefixed-stream/decode');
 var nextTick = require('process-nextick-args');
-
-var pool = new Buffer(10 * 1024);
-var used = 0;
 
 var Server = function (opts) {
     this.opts = opts;
@@ -55,47 +50,86 @@ var Wrap = function (socket, opts) {
 
     stream.Duplex.call(this);
 
-    var self = this;
+    this._missing = 0;
+    this._message = null;
+    this._limit = opts && opts.limit || 0;
+    this._prefix = new Buffer(4);
+    this._ptr = 0;
+    this.socket = socket;
 
     socket.setNoDelay();
 
-    this.socket = socket;
-    this.decode = new Decoder(opts);
-
-    socket.pipe(this.decode);
-
-    socket.on('error', function (err) {
-        self.emit('error', err);
-    });
-
-    this.decode.on('error', function (err) {
-        self.emit('error', err);
-        socket.end();
-    });
-
-    this.decode.on('end', function () {
-        self.emit('end');
-        self.socket.destroy();
-    });
-
-    this.decode.on('data', function (data) {
-        self.push(data);
-    });
+    socket.on('data', onData.bind(this));
+    socket.on('end', onEnd.bind(this));
+    socket.on('error', onError.bind(this));
 };
 
 util.inherits(Wrap, stream.Duplex);
+
+Wrap.prototype._push = function (message) {
+    this._ptr = 0;
+    this._missing = 0;
+    this._message = null;
+    this.push(message);
+}
+
+Wrap.prototype._prefixError = function (data) {
+    this.emit('error', new Error('Message is larger than max length'));
+    return data.length;
+}
+
+Wrap.prototype._parseLength = function (data, offset) {
+
+    for (offset; offset < data.length; offset++) {
+        if (this._ptr >= this._prefix.length) return this._prefixError(data)
+        this._prefix[this._ptr++] = data[offset]
+        if (this._ptr === 4) {
+            this._missing = this._prefix.readUInt32BE(0, true);
+            if (this._limit && this._missing > this._limit) return this._prefixError(data)
+            this._ptr = 0
+            return offset + 1
+        }
+    }
+
+    return data.length
+}
+
+Wrap.prototype._parseMessage = function (data, offset) {
+    var free = data.length - offset
+    var missing = this._missing
+
+    if (!this._message) {
+        if (missing <= free) { // fast track - no copy
+            this._push(data.slice(offset, offset + missing))
+            return offset + missing
+        }
+        this._message = new Buffer(missing)
+    }
+
+    data.copy(this._message, this._ptr, offset, offset + missing)
+
+    if (missing <= free) {
+        this._push(this._message)
+        return offset + missing
+    }
+
+    this._missing -= free
+    this._ptr += free
+
+    return data.length
+}
 
 Wrap.prototype.end = function () {
     this.socket.end();
 };
 
 Wrap.prototype._read = function (n) {
-    this.decode.read(n);
+
 };
 
 Wrap.prototype._write = function (data, encoding, cb) {
     this.socket.cork();
-    this.socket.write(getVarintBytes(data.length));
+    this.socket.write(getLengthBytes(data.length));
     this.socket.write(data, cb);
     nextTick(uncork, this.socket);
 };
@@ -110,7 +144,7 @@ Wrap.prototype.writeMultipart = function (parts, cb) {
 
     this.socket.cork();
 
-    this.socket.write(getVarintBytes(length));
+    this.socket.write(getLengthBytes(length));
 
     for (i = 0; i < parts.length - 1; i++) {
         this.socket.write(parts[i]);
@@ -121,20 +155,37 @@ Wrap.prototype.writeMultipart = function (parts, cb) {
     nextTick(uncork, this.socket);
 };
 
-function getVarintBytes (length) {
-    if (pool.length - used < 100) {
-        pool = new Buffer(10 * 1024);
-        used = 0;
-    }
+function getLengthBytes (length) {
 
-    varint.encode(length, pool, used);
-    used += varint.encode.bytes;
-
-    return pool.slice(used - varint.encode.bytes, used);
+    var header = new Buffer(4);
+    header.writeUInt32BE(length, 0, true);
+    return header;
 }
 
-function uncork(socket) {
+function uncork (socket) {
     socket.uncork();
+}
+
+function onData (data) {
+
+    var offset = 0;
+
+    while (offset < data.length) {
+        if (this._missing) {
+            offset = this._parseMessage(data, offset);
+        } else {
+            offset = this._parseLength(data, offset);
+        }
+    }
+}
+
+function onError (err) {
+    this.emit('error', err);
+}
+
+function onEnd () {
+    this.emit('end');
+    this.socket.end();
 }
 
 module.exports.Server = Server;

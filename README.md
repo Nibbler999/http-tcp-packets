@@ -41,15 +41,7 @@ var packets = require('http-tcp-packets');
 
 var packetClient = new packets.Client();
 
-var opts = {
-    host: '127.0.0.1',
-    port: 8080,
-    headers: {
-        foo: 'bar'
-    }
-};
-
-packetClient.connect(opts, function (err, conn) {
+packetClient.connect('http://127.0.0.1:8080', function (err, conn) {
 
     if (err) {
         return console.error(err);

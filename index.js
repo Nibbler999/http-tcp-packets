@@ -4,6 +4,7 @@ var stream = require('stream');
 var util = require('util');
 var http = require('http');
 var https = require('https');
+var url = require('url');
 
 var nextTick = require('process-nextick-args');
 
@@ -25,6 +26,12 @@ Server.prototype.handleUpgrade = function (socket, cb) {
 var Client = function() { };
 
 Client.prototype.connect = function (opts, cb) {
+
+    if (typeof opts === 'string') {
+        opts = url.parse(opts);
+    }
+
+    opts.headers = opts.headers || {};
 
     opts.headers['Connection'] = 'Upgrade';
     opts.headers['Upgrade'] = 'http-tcp-packets';

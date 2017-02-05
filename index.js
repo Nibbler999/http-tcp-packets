@@ -87,7 +87,9 @@ Wrap.prototype._push = function (message) {
 
     this._flags = 0;
 
-    this.push(message);
+    if (!this.push(message)) {
+        this.socket.pause();
+    }
 }
 
 Wrap.prototype._prefixError = function (data) {
@@ -144,20 +146,16 @@ Wrap.prototype.end = function () {
     this.socket.end();
 };
 
-Wrap.prototype._read = function (n) {
-
+Wrap.prototype._read = function () {
+    this.socket.resume();
 };
 
 Wrap.prototype._write = function (data, encoding, cb) {
-    this.write(data, cb);
-};
-
-Wrap.prototype.write = function (data, cb) {
 
     var flags = 0;
 
     if (typeof data === 'string') {
-        data = new Buffer(data);
+        data = new Buffer(data, encoding);
         flags |= 1;
     }
 

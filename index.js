@@ -72,8 +72,6 @@ var Wrap = function (socket, opts) {
     socket.on('data', onData.bind(this));
     socket.on('end', onEnd.bind(this));
     socket.on('error', onError.bind(this));
-
-    this.readUInt32BE = Buffer.prototype.readUInt32BE.bind(this._prefix);
 };
 
 util.inherits(Wrap, stream.Duplex);
@@ -104,8 +102,8 @@ Wrap.prototype._parseLength = function (data, offset) {
         if (this._ptr >= this._prefix.length) return this._prefixError(data)
         this._prefix[this._ptr++] = data[offset]
         if (this._ptr === 8) {
-            this._missing = this.readUInt32BE(0, true);
-            this._flags = this.readUInt32BE(4, true);
+            this._missing = Buffer.prototype.readUInt32BE.call(this._prefix, 0, true)
+            this._flags = Buffer.prototype.readUInt32BE.call(this._prefix, 4, true)
             if (this._missing === 0) return this._push(this._flags & 1 ? '' : new Buffer(0))
             if (this._limit && this._missing > this._limit) return this._prefixError(data)
             if ((this._flags & 1) && this._missing > (1 << 28) - 16) return this._prefixError(data)

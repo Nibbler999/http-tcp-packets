@@ -6,6 +6,7 @@ var http = require('http');
 var https = require('https');
 var url = require('url');
 
+var Buffer = require('safe-buffer').Buffer;
 var nextTick = require('process-nextick-args');
 
 var Server = function (opts) {
@@ -106,7 +107,7 @@ Wrap.prototype._parseLength = function (data, offset) {
         if (this._ptr === 8) {
             this._missing = Buffer.prototype.readUInt32BE.call(this._prefix, 0, true)
             this._flags = Buffer.prototype.readUInt32BE.call(this._prefix, 4, true)
-            if (this._missing === 0) return this._push(this._flags & 1 ? '' : new Buffer(0))
+            if (this._missing === 0) return this._push(this._flags & 1 ? '' : Buffer.alloc(0))
             if (this._limit && this._missing > this._limit) return this._prefixError(data)
             if ((this._flags & 1) && this._missing > (1 << 28) - 16) return this._prefixError(data)
             this._ptr = 0
@@ -126,7 +127,7 @@ Wrap.prototype._parseMessage = function (data, offset) {
             this._push(data.slice(offset, offset + missing))
             return offset + missing
         }
-        this._message = new Buffer(missing)
+        this._message = Buffer.allocUnsafe(missing)
     }
 
     data.copy(this._message, this._ptr, offset, offset + missing)
@@ -155,7 +156,7 @@ Wrap.prototype._write = function (data, encoding, cb) {
     var flags = 0;
 
     if (typeof data === 'string') {
-        data = new Buffer(data, encoding);
+        data = Buffer.from(data);
         flags |= 1;
     }
 
@@ -192,7 +193,7 @@ Wrap.prototype.writev = function (parts, cb) {
 
 function getPrefix (length, flags) {
 
-    var prefix = new Buffer(8);
+    var prefix = Buffer.allocUnsafe(8);
     prefix.writeUInt32BE(length, 0, true);
     prefix.writeUInt32BE(flags, 4, true);
     return prefix;

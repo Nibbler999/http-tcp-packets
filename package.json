@@ -1,12 +1,13 @@
 {
   "name": "http-tcp-packets",
-  "version": "2.0.3",
+  "version": "2.1.0",
   "license": "MIT",
   "repository": {
     "type": "git",
     "url": "git://github.com/Nibbler999/http-tcp-packets"
   },
   "dependencies": {
-    "process-nextick-args": "^1.0.6"
+    "process-nextick-args": "^1.0.6",
+    "safe-buffer": "^5.0.1"
   }
 }

@@ -48,7 +48,7 @@ Client.prototype.connect = function (opts, cb) {
     req.once('upgrade', function upgrade(res, socket, upgradeHead) {
         req.removeAllListeners('error');
         socket.unshift(upgradeHead);
-        cb(null, new Wrap(socket));
+        cb(null, new Wrap(socket, opts));
     });
 };
 
@@ -67,6 +67,7 @@ var Wrap = function (socket, opts) {
     this._prefix = new Array(8);
     this._ptr = 0;
     this.socket = socket;
+    this._binaryType = opts && opts.binaryType || 'buffer';
 
     socket.setNoDelay();
 
@@ -127,10 +128,14 @@ Wrap.prototype._parseMessage = function (data, offset) {
             this._push(data.slice(offset, offset + missing))
             return offset + missing
         }
-        this._message = Buffer.allocUnsafe(missing)
+        this._message = this._binaryType === 'fragments' ? [] : Buffer.allocUnsafe(missing);
     }
 
-    data.copy(this._message, this._ptr, offset, offset + missing)
+    if (this._binaryType === 'fragments') {
+        this._message.push(data.slice(offset, offset + missing));
+    } else {
+        data.copy(this._message, this._ptr, offset, offset + missing)
+    }
 
     if (missing <= free) {
         this._push(this._message)

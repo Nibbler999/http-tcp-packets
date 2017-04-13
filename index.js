@@ -67,7 +67,7 @@ var Wrap = function (socket, opts) {
     this._prefix = new Array(8);
     this._ptr = 0;
     this.socket = socket;
-    this._binaryType = opts && opts.binaryType || 'buffer';
+    this._binaryType = opts && opts.binaryType || 'nodebuffer';
 
     socket.setNoDelay();
 

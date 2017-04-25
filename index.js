@@ -112,7 +112,7 @@ Wrap.prototype._parseLength = function (data, offset) {
             if (this._missing === 0) return this._push(this._flags & 1 ? '' : Buffer.alloc(0))
             if (this._limit && this._missing > this._limit) return this._prefixError(data)
             if ((this._flags & 1) && this._missing > (1 << 28) - 16) return this._prefixError(data)
-            this._fragmenting = this._binaryType === 'fragments' && this._flags & 1 === 0
+            this._fragmenting = this._binaryType === 'fragments' && (this._flags & 1) === 0
             this._ptr = 0
             return offset + 1
         }

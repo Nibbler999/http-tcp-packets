@@ -175,25 +175,39 @@ Wrap.prototype._write = function (data, encoding, cb) {
     nextTick(uncork, this.socket);
 };
 
-Wrap.prototype.writev = function (parts, cb) {
+Wrap.prototype.send = function (data, cb) {
 
     var flags = 0;
-    var length = 0;
-    var i = 0;
-
-    for (i = 0; i < parts.length; i++) {
-       length += parts[i].length;
-    }
 
     this.socket.cork();
 
-    this.socket.write(getPrefix(length, flags));
+    if (Array.isArray(data)) {
 
-    for (i = 0; i < parts.length - 1; i++) {
-        this.socket.write(parts[i]);
+        var length = 0;
+        var i = 0;
+
+        for (i = 0; i < data.length; i++) {
+           length += data[i].length;
+        }
+
+        this.socket.write(getPrefix(length, flags));
+
+        for (i = 0; i < data.length - 1; i++) {
+            this.socket.write(data[i]);
+        }
+
+        this.socket.write(data[data.length - 1], cb);
+
+    } else {
+
+        if (typeof data === 'string') {
+            data = Buffer.from(data);
+            flags |= 1;
+        }
+
+        this.socket.write(getPrefix(data.length, flags));
+        this.socket.write(data, cb);
     }
-
-    this.socket.write(parts[parts.length - 1], cb);
 
     nextTick(uncork, this.socket);
 };

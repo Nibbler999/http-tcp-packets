@@ -148,7 +148,7 @@ Wrap.prototype._parseMessage = function (data, offset) {
     return data.length
 }
 
-Wrap.prototype.end = function () {
+Wrap.prototype.end = Wrap.prototype.close = function () {
     this.socket.end();
 };
 

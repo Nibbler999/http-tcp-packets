@@ -1,10 +1,10 @@
 'use strict';
 
-var stream = require('stream');
 var util = require('util');
 var http = require('http');
 var https = require('https');
 var url = require('url');
+var EventEmitter = require('events').EventEmitter;
 
 var Buffer = require('safe-buffer').Buffer;
 var nextTick = require('process-nextick-args');
@@ -58,7 +58,7 @@ var Wrap = function (socket, opts) {
         return new Wrap(socket, opts);
     }
 
-    stream.Duplex.call(this, { objectMode: true });
+    EventEmitter.call(this);
 
     this._missing = 0;
     this._message = null;
@@ -77,7 +77,7 @@ var Wrap = function (socket, opts) {
     socket.on('error', onError.bind(this));
 };
 
-util.inherits(Wrap, stream.Duplex);
+util.inherits(Wrap, EventEmitter);
 
 Wrap.prototype._push = function (message) {
     this._ptr = 0;
@@ -90,9 +90,7 @@ Wrap.prototype._push = function (message) {
 
     this._flags = 0;
 
-    if (!this.push(message)) {
-        this.socket.pause();
-    }
+    this.emit('data', message);
 }
 
 Wrap.prototype._prefixError = function (data) {
@@ -152,27 +150,6 @@ Wrap.prototype._parseMessage = function (data, offset) {
 
 Wrap.prototype.end = function () {
     this.socket.end();
-};
-
-Wrap.prototype._read = function () {
-    this.socket.resume();
-};
-
-Wrap.prototype._write = function (data, encoding, cb) {
-
-    var flags = 0;
-
-    if (typeof data === 'string') {
-        data = Buffer.from(data);
-        flags |= 1;
-    }
-
-    this.socket.cork();
-
-    this.socket.write(getPrefix(data.length, flags));
-    this.socket.write(data, cb);
-
-    nextTick(uncork, this.socket);
 };
 
 Wrap.prototype.send = function (data, cb) {

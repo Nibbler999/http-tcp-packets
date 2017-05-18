@@ -21,7 +21,7 @@ var packetServer = new packets.Server();
 srv.on('upgrade', (req, socket, head) => {
     packetServer.handleUpgrade(socket, (conn) => {
 
-        conn.write('hello client');
+        conn.send('hello client');
 
         conn.on('data', (data) => {
             console.log(data);
@@ -47,7 +47,7 @@ packetClient.connect('http://127.0.0.1:8080', function (err, conn) {
         return console.error(err);
     }
 
-    conn.write('hello server');
+    conn.send('hello server');
 
     conn.on('data', (data) => {
         console.log(data);

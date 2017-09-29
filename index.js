@@ -6,6 +6,8 @@ var https = require('https');
 var url = require('url');
 var EventEmitter = require('events').EventEmitter;
 
+var readUInt32BE = require('buffer').Buffer.prototype.readUInt32BE;
+
 var Buffer = require('safe-buffer').Buffer;
 var nextTick = require('process-nextick-args');
 
@@ -105,8 +107,8 @@ Wrap.prototype._parseLength = function (data, offset) {
         if (this._ptr >= this._prefix.length) return this._prefixError(data)
         this._prefix[this._ptr++] = data[offset]
         if (this._ptr === 8) {
-            this._missing = Buffer.prototype.readUInt32BE.call(this._prefix, 0, true)
-            this._flags = Buffer.prototype.readUInt32BE.call(this._prefix, 4, true)
+            this._missing = readUInt32BE.call(this._prefix, 0, true)
+            this._flags = readUInt32BE.call(this._prefix, 4, true)
             if (this._missing === 0) return this._push(this._flags & 1 ? '' : Buffer.alloc(0))
             if (this._limit && this._missing > this._limit) return this._prefixError(data)
             if ((this._flags & 1) && this._missing > (1 << 28) - 16) return this._prefixError(data)
